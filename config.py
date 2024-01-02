@@ -2,14 +2,14 @@ from pathlib import Path
 
 def get_config():
     return {
-        "batch_size": 8, # 4 ?
-        "num_epochs": 20, # 10 ?
-        "lr": 10**-4, # 0.001 ?
-        "seq_len": 350, 
-        "d_model": 512,
-        "datasource": 'opus_books',
-        "lang_src": "en",
-        "lang_tgt": "it",
+        "batch_size": 4, # should be 8
+        "num_epochs": 10, # should be 20
+        "lr": 0.001, # should be 10**-4
+        "seq_len": 400, 
+        "d_model": 512, #should be 512
+        "datasource": 'cnn_dailymail',
+        "text_src": "article",
+        "text_tgt": 'highlights',
         "model_folder": "weights",
         "model_basename": "tmodel_",
         "preload": "latest",

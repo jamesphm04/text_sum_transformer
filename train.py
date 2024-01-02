@@ -10,8 +10,10 @@ from pathlib import Path
 from tqdm import tqdm
 import warnings
 import os
+import numpy as np
+import pandas as pd
 
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.trainers import WordLevelTrainer
@@ -20,18 +22,18 @@ from tokenizers.pre_tokenizers import Whitespace
 import torchmetrics
 from torch.utils.tensorboard import SummaryWriter
 
-def get_all_sentences(ds, lang):
+def get_all_sentences(ds, text_type):
     for item in ds:
-        yield item['translation'][lang] #load just a function, call by 'next' if needed (generator)
+        yield item[text_type] #load just a function, call by 'next' if needed (generator)
 
-def get_or_build_tokenizer(config, ds, lang):
-    tokenizer_path = Path(config['tokenizer_file'].format(lang)) #'/path/to/tokenizer_{lang}.txt' 
+def get_or_build_tokenizer(config, ds, text_type):
+    tokenizer_path = Path(config['tokenizer_file'].format(text_type)) #'/path/to/tokenizer_{text_type}.txt' 
     if not Path.exists(tokenizer_path):
         # Most code taken from: https://huggingface.co/docs/tokenizers/quicktour
         tokenizer = Tokenizer(WordLevel(unk_token='[UNK]'))
         tokenizer.pre_tokenizer = Whitespace()
         trainer = WordLevelTrainer(special_tokens=['[UNK]', '[PAD]', '[SOS]', '[EOS]'], min_frequency=2)
-        tokenizer.train_from_iterator(get_all_sentences(ds, lang), trainer=trainer)
+        tokenizer.train_from_iterator(get_all_sentences(ds, text_type), trainer=trainer)
     else:
         tokenizer = Tokenizer.from_file(str(tokenizer_path))
         
@@ -39,27 +41,37 @@ def get_or_build_tokenizer(config, ds, lang):
 
 def get_ds(config):
     # only has the train -> divide train, test, valid by ourself
-    ds_raw = load_dataset(f"{config['datasource']}", f"{config['lang_src']}-{config['lang_tgt']}", split='train')
+    ds_raw = load_dataset(f"{config['datasource']}", '1.0.0', split='train[:5%]')
+    
+    #cleaning the dataset
+    df = pd.DataFrame(ds_raw)
+    df = df.drop('id', axis=1)
+    
+    df = df[df['article'].apply(lambda x: len(x.split()) <= 300)]
+    df = df[df['highlights'].apply(lambda x: len(x.split()) <= 50)]
+    df = df.reset_index(drop=True)
+    
+    ds_raw = Dataset.from_pandas(df)
     
     # Build tokenizers
-    tokenizer_src = get_or_build_tokenizer(config, ds_raw, config['lang_src'])
-    tokenizer_tgt = get_or_build_tokenizer(config, ds_raw, config['lang_tgt'])
+    tokenizer_src = get_or_build_tokenizer(config, ds_raw, config['text_src'])
+    tokenizer_tgt = get_or_build_tokenizer(config, ds_raw, config['text_tgt'])
     
     # Keep 90% for training, 10% for validation
     train_ds_size = int(0.9 * len(ds_raw))
     val_ds_size = len(ds_raw) - train_ds_size
     train_ds_raw, val_ds_raw = random_split(ds_raw, [train_ds_size, val_ds_size])
     
-    train_ds = BilingualDataset(train_ds_raw, tokenizer_src, tokenizer_tgt, config['lang_src'], config['lang_tgt'], config['seq_len'])
-    val_ds = BilingualDataset(val_ds_raw, tokenizer_src, tokenizer_tgt, config['lang_src'], config['lang_tgt'], config['seq_len'])
+    train_ds = BilingualDataset(train_ds_raw, tokenizer_src, tokenizer_tgt, config['text_src'], config['text_tgt'], config['seq_len'])
+    val_ds = BilingualDataset(val_ds_raw, tokenizer_src, tokenizer_tgt, config['text_src'], config['text_tgt'], config['seq_len'])
     
     # Find the maximum length of each sentence in the source and target sentence
     max_len_src = 0
     max_len_tgt = 0
 
     for item in ds_raw:
-        src_ids = tokenizer_src.encode(item['translation'][config['lang_src']]).ids
-        tgt_ids = tokenizer_tgt.encode(item['translation'][config['lang_tgt']]).ids
+        src_ids = tokenizer_src.encode(item[config['text_src']]).ids
+        tgt_ids = tokenizer_tgt.encode(item[config['text_tgt']]).ids
         max_len_src = max(max_len_src, len(src_ids))
         max_len_tgt = max(max_len_tgt, len(tgt_ids))
 
@@ -144,13 +156,12 @@ def train_model(config):
             
             #update the weights
             optimizer.step()
-            optimizer.zero_grad(set_to_none=True)
-            
-            #run validation at the end of each epoch
-            run_validation(model, val_dataloader, tokenizer_src, tokenizer_tgt, config['seq_len'], device, lambda msg: batch_iterator.write(msg), global_step, writer)
+            optimizer.zero_grad(set_to_none=True)    
             
             global_step += 1
             
+        #run validation at the end of each epoch
+        run_validation(model, val_dataloader, tokenizer_src, tokenizer_tgt, config['seq_len'], device, lambda msg: batch_iterator.write(msg), global_step, writer)
         #save the model at the end of every epoch 
         model_filename = get_weights_file_path(config, f'{epoch:02d}')
         torch.save({
@@ -194,7 +205,6 @@ def greedy_decode(model, source, source_mask, tokenizer_src, tokenizer_tgt, max_
 def run_validation(model, validation_ds, tokenizer_src, tokenizer_tgt, max_len, device, print_msg, global_step, writer, num_examples=2):
     model.eval()
     count = 0
-    print('ddddddddddddddddddddddddddddddddd')
     
     source_texts = []
     expected = []
