@@ -87,7 +87,7 @@ class MultiHeadAttentionBlock(nn.Module):
         d_k = query.shape[-1]
         # apply formula
         # (batch, h, seq_len, d_k) -> (batch, h, seq_len, seq_len)
-        attention_scores = (query @ key.tranpose(-2, -1)) / math.sqrt(d_k)
+        attention_scores = (query @ key.transpose(-2, -1)) / math.sqrt(d_k)
         
         if mask is not None:
             # write a very low value (indicating -inf) to the positions where mask == 0 
@@ -116,7 +116,7 @@ class MultiHeadAttentionBlock(nn.Module):
         
         # combine all the heads together 
         # (batch, h, seq_len, d_k) -> (batch, seq_len, h, d_k).contiguous (basically execute it inplacely) -> (batch, seq_len, d_model)
-        x = x.transpose(1, 2).continguous().view(x.shape[0], -1, self.h * self.d_k)
+        x = x.transpose(1, 2).contiguous().view(x.shape[0], -1, self.h * self.d_k)
         
         # multiply by Wo
         # (batch, seq_len, d_model) -> (batch, seq_len, d_model)
@@ -141,7 +141,7 @@ class EncoderBlock(nn.Module):
     def forward(self, x, src_mask):
         # add src_mask here in order to make <pad> not interact with others
         x = self.residual_connections[0](x, lambda x: self.self_attention_block(x, x, x, src_mask)) # Res_1st: first layer is x, second layer is the output of multiheadAttentionBlock, which is receive x, x, x as q, k, v
-        x = self.residual_connection[1](x, self.feed_forward_block) # Res_2nd: first layer is the output of Res_1st, second layer is feed_forward
+        x = self.residual_connections[1](x, self.feed_forward_block) # Res_2nd: first layer is the output of Res_1st, second layer is feed_forward
         return x
     
 class Encoder(nn.Module):
@@ -153,21 +153,21 @@ class Encoder(nn.Module):
     def forward(self, x, mask):
         for layer in self.layers:
             x = layer(x, mask)
-        return self.norm(x)
+        return self.norms(x)
     
 class DecoderBlock(nn.Module):
     def __init__(self, features: int, self_attention_block: MultiHeadAttentionBlock, cross_attention_block: MultiHeadAttentionBlock, feed_forward_block:FeedForwardBlock, dropout: float) -> None:
+        super().__init__()
         self.self_attention_block = self_attention_block
         self.cross_attention_block = cross_attention_block
         self.feed_forward_block = feed_forward_block
         self.residual_connections = nn.ModuleList([ResidualConnection(features, dropout) for _ in range(3)])
     
     def forward(self, x, encoder_output, src_mask, tgt_mask):
-        self_attention_block_output = self.self_attention_block(x, x, x, tgt_mask)
-        x = self.residual_connections[0](x, self_attention_block_output)
-        cross_attention_block_output = self.cross_attention_block(x, encoder_output, encoder_output, src_mask) # q, k, v
-        x = self.residual_connections[1](x, cross_attention_block_output)
+        x = self.residual_connections[0](x, lambda x: self.self_attention_block(x, x, x, tgt_mask))
+        x = self.residual_connections[1](x, lambda x: self.cross_attention_block(x, encoder_output, encoder_output, src_mask))
         x = self.residual_connections[2](x, self.feed_forward_block)
+        return x
         
 class Decoder(nn.Module):
     def __init__(self, features: int, layers: nn.ModuleList) -> None:
@@ -217,7 +217,7 @@ class Transformer(nn.Module):
     
 # put it all together 
 
-def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_seq_len: int, tgt_seq_len: int, d_model: int=512, N: int=6, h: int=8, dropout: float=0.1, d_ff: int=2048) -> Transformer:
+def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_seq_len: int, tgt_seq_len: int, d_model: int=512, N: int=1, h: int=4, dropout: float=0.1, d_ff: int=2048) -> Transformer:
     # src_vocab_size : number of unique words in src vocab
     # tgt_vocab_size : number of unique words in tgt vocab
     # src_seq_len : max number of words in a src sentence
@@ -241,7 +241,7 @@ def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_seq_len: int
     for _ in range(N):
         encoder_self_attention_block = MultiHeadAttentionBlock(d_model, h, dropout)
         feed_forward_block = FeedForwardBlock(d_model, d_ff, dropout)
-        encoder_block = EncoderBlock(d_model, encoder_self_attention_block, feed_forward_block)
+        encoder_block = EncoderBlock(d_model, encoder_self_attention_block, feed_forward_block, dropout)
         encoder_blocks.append(encoder_block)
         
     # create the decoder blocks
@@ -250,7 +250,7 @@ def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_seq_len: int
         decoder_self_attention_block = MultiHeadAttentionBlock(d_model, h, dropout)
         decoder_cross_attention_block = MultiHeadAttentionBlock(d_model, h, dropout)
         feed_forward_block = FeedForwardBlock(d_model, d_ff, dropout)
-        decoder_block = DecoderBlock(d_model, decoder_self_attention_block, decoder_cross_attention_block, feed_forward_block)
+        decoder_block = DecoderBlock(d_model, decoder_self_attention_block, decoder_cross_attention_block, feed_forward_block, dropout)
         decoder_blocks.append(decoder_block)
         
     # create encoder and decoder
