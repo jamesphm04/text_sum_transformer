@@ -234,9 +234,9 @@ def run_validation(model, validation_ds, tokenizer_src, tokenizer_tgt, max_len, 
             target_text = batch['tgt_text'][0]
             model_out_text = tokenizer_tgt.decode(model_out.detach().cpu().numpy())
             
-            # source_texts.append(source_text)
-            # expected.append(target_text)
-            # predicted.append(model_out_text)
+            source_texts.append(source_text)
+            expected.append(target_text)
+            predicted.append(model_out_text)
             
             # Print the source, target and model output
             print_msg('-'*console_width)
@@ -248,25 +248,25 @@ def run_validation(model, validation_ds, tokenizer_src, tokenizer_tgt, max_len, 
                 print_msg('-'*console_width)
                 break
             
-    # if writer:
-    #     # Evaluate the character error rate
-    #     # Compute the char error rate 
-    #     metric = torchmetrics.CharErrorRate()
-    #     cer = metric(predicted, expected)
-    #     writer.add_scalar('validation cer', cer, global_step)
-    #     writer.flush()
+    if writer:
+        # Evaluate the character error rate
+        # Compute the char error rate 
+        metric = torchmetrics.CharErrorRate()
+        cer = metric(predicted, expected)
+        writer.add_scalar('validation cer', cer, global_step)
+        writer.flush()
 
-    #     # Compute the word error rate
-    #     metric = torchmetrics.WordErrorRate()
-    #     wer = metric(predicted, expected)
-    #     writer.add_scalar('validation wer', wer, global_step)
-    #     writer.flush()
+        # Compute the word error rate
+        metric = torchmetrics.WordErrorRate()
+        wer = metric(predicted, expected)
+        writer.add_scalar('validation wer', wer, global_step)
+        writer.flush()
 
-    #     # Compute the BLEU metric
-    #     metric = torchmetrics.BLEUScore()
-    #     bleu = metric(predicted, expected)
-    #     writer.add_scalar('validation BLEU', bleu, global_step)
-    #     writer.flush()
+        # Compute the BLEU metric
+        metric = torchmetrics.BLEUScore()
+        bleu = metric(predicted, expected)
+        writer.add_scalar('validation BLEU', bleu, global_step)
+        writer.flush()
     
 if __name__ == '__main__':
     warnings.filterwarnings('ignore')
