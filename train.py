@@ -10,7 +10,6 @@ from pathlib import Path
 from tqdm import tqdm
 import warnings
 import os
-import numpy as np
 import pandas as pd
 
 from datasets import load_dataset, Dataset
@@ -26,7 +25,7 @@ def get_all_sentences(ds, text_type):
     for item in ds:
         yield item[text_type] #load just a function, call by 'next' if needed (generator)
 
-def get_or_build_tokenizer(config, ds, text_type):
+def get_or_build_tokenizer(config, text_type, ds={}):
     tokenizer_path = Path(config['tokenizer_file'].format(text_type)) #'/path/to/tokenizer_{text_type}.txt' 
     if not Path.exists(tokenizer_path):
         # Most code taken from: https://huggingface.co/docs/tokenizers/quicktour
@@ -34,6 +33,7 @@ def get_or_build_tokenizer(config, ds, text_type):
         tokenizer.pre_tokenizer = Whitespace()
         trainer = WordLevelTrainer(special_tokens=['[UNK]', '[PAD]', '[SOS]', '[EOS]'], min_frequency=2)
         tokenizer.train_from_iterator(get_all_sentences(ds, text_type), trainer=trainer)
+        tokenizer.save(str(tokenizer_path))
     else:
         tokenizer = Tokenizer.from_file(str(tokenizer_path))
         
@@ -54,8 +54,8 @@ def get_ds(config):
     ds_raw = Dataset.from_pandas(df)
     
     # Build tokenizers
-    tokenizer_src = get_or_build_tokenizer(config, ds_raw, config['text_src'])
-    tokenizer_tgt = get_or_build_tokenizer(config, ds_raw, config['text_tgt'])
+    tokenizer_src = get_or_build_tokenizer(config, config['text_src'], ds_raw)
+    tokenizer_tgt = get_or_build_tokenizer(config, config['text_tgt'], ds_raw)
     
     # Keep 90% for training, 10% for validation
     train_ds_size = int(0.9 * len(ds_raw))
@@ -89,8 +89,8 @@ def get_model(config, vocab_src_len, vocab_tgt_len):
 
 def train_model(config):
     #Define the device 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # device = 'cpu'
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = 'cpu'
     print(f'Using device {device}')
     
     #Make sure the weigths folder exists
