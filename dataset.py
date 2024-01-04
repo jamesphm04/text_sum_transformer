@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset 
 
-class BilingualDataset(Dataset):
+class NewsSumDataset(Dataset):
     def __init__(self, ds, tokenizer_src, tokenizer_tgt, src_text, tgt_text, seq_len):
         super().__init__()
         self.seq_len = seq_len

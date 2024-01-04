@@ -1,4 +1,4 @@
-from dataset import BilingualDataset, causal_mask
+from dataset import NewsSumDataset, causal_mask
 from model import build_transformer
 from config import get_config, get_weights_file_path, latest_weights_file_path
 
@@ -62,8 +62,8 @@ def get_ds(config):
     val_ds_size = len(ds_raw) - train_ds_size
     train_ds_raw, val_ds_raw = random_split(ds_raw, [train_ds_size, val_ds_size])
     
-    train_ds = BilingualDataset(train_ds_raw, tokenizer_src, tokenizer_tgt, config['text_src'], config['text_tgt'], config['seq_len'])
-    val_ds = BilingualDataset(val_ds_raw, tokenizer_src, tokenizer_tgt, config['text_src'], config['text_tgt'], config['seq_len'])
+    train_ds = NewsSumDataset(train_ds_raw, tokenizer_src, tokenizer_tgt, config['text_src'], config['text_tgt'], config['seq_len'])
+    val_ds = NewsSumDataset(val_ds_raw, tokenizer_src, tokenizer_tgt, config['text_src'], config['text_tgt'], config['seq_len'])
     
     # Find the maximum length of each sentence in the source and target sentence
     max_len_src = 0
@@ -89,8 +89,8 @@ def get_model(config, vocab_src_len, vocab_tgt_len):
 
 def train_model(config):
     #Define the device 
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = 'cpu'
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = 'cpu'
     print(f'Using device {device}')
     
     #Make sure the weigths folder exists
@@ -267,7 +267,9 @@ def run_validation(model, validation_ds, tokenizer_src, tokenizer_tgt, max_len, 
         bleu = metric(predicted, expected)
         writer.add_scalar('validation BLEU', bleu, global_step)
         writer.flush()
-    
+
+
+
 if __name__ == '__main__':
     warnings.filterwarnings('ignore')
     config = get_config()
