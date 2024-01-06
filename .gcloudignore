@@ -4,7 +4,7 @@
 # file at that point).
 #
 # For more information, run:
-#   $ gcloud topic gcloudignore
+#   $ gcloud topic gcloudignor
 #
 .gcloudignore
 # If you would like to upload your .git directory, .gitignore file or files
