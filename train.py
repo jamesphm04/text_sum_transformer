@@ -18,9 +18,6 @@ from tokenizers.models import WordLevel
 from tokenizers.trainers import WordLevelTrainer
 from tokenizers.pre_tokenizers import Whitespace
 
-import torchmetrics
-from torch.utils.tensorboard import SummaryWriter
-
 def get_all_sentences(ds, text_type):
     for item in ds:
         yield item[text_type] #load just a function, call by 'next' if needed (generator)
@@ -99,9 +96,6 @@ def train_model(config):
     train_dataloader, val_dataloader, tokenizer_src, tokenizer_tgt = get_ds(config)
     model = get_model(config, tokenizer_src.get_vocab_size(), tokenizer_tgt.get_vocab_size()).to(device)
     
-    #Tensorboard
-    writer = SummaryWriter(config['experiment_name'])
-    
     #optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'], eps=1e-9)
     
@@ -147,10 +141,6 @@ def train_model(config):
             loss = loss_fn(proj_output.view(-1, tokenizer_tgt.get_vocab_size()), label.view(-1))
             batch_iterator.set_postfix({'loss': f'{loss.item():6.3f}'})
             
-            #log the loss
-            writer.add_scalar('train loss', loss.item(), global_step)
-            writer.flush()
-            
             #backpropagate the loss 
             loss.backward()
             
@@ -161,7 +151,7 @@ def train_model(config):
             global_step += 1
             
         #run validation at the end of each epoch
-        run_validation(model, val_dataloader, tokenizer_src, tokenizer_tgt, config['seq_len'], device, lambda msg: batch_iterator.write(msg), global_step, writer)
+        run_validation(model, val_dataloader, tokenizer_src, tokenizer_tgt, config['seq_len'], device, lambda msg: batch_iterator.write(msg), global_step)
         #save the model at the end of every epoch 
         model_filename = get_weights_file_path(config, f'{epoch:02d}')
         torch.save({
@@ -202,7 +192,7 @@ def greedy_decode(model, source, source_mask, tokenizer_src, tokenizer_tgt, max_
     
     return decoder_input.squeeze(0)
 
-def run_validation(model, validation_ds, tokenizer_src, tokenizer_tgt, max_len, device, print_msg, global_step, writer, num_examples=2):
+def run_validation(model, validation_ds, tokenizer_src, tokenizer_tgt, max_len, device, print_msg, global_step, num_examples=2):
     model.eval()
     count = 0
     
@@ -248,28 +238,6 @@ def run_validation(model, validation_ds, tokenizer_src, tokenizer_tgt, max_len, 
                 print_msg('-'*console_width)
                 break
             
-    if writer:
-        # Evaluate the character error rate
-        # Compute the char error rate 
-        metric = torchmetrics.CharErrorRate()
-        cer = metric(predicted, expected)
-        writer.add_scalar('validation cer', cer, global_step)
-        writer.flush()
-
-        # Compute the word error rate
-        metric = torchmetrics.WordErrorRate()
-        wer = metric(predicted, expected)
-        writer.add_scalar('validation wer', wer, global_step)
-        writer.flush()
-
-        # Compute the BLEU metric
-        metric = torchmetrics.BLEUScore()
-        bleu = metric(predicted, expected)
-        writer.add_scalar('validation BLEU', bleu, global_step)
-        writer.flush()
-
-
-
 if __name__ == '__main__':
     warnings.filterwarnings('ignore')
     config = get_config()
