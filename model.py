@@ -41,11 +41,11 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
     
 class LayerNormalization(nn.Module):
-    def __init__(self, features: int,  eps: float = 10**-6) -> None:
+    def __init__(self, d_model: int,  eps: float = 10**-6) -> None:
         super().__init__()
         self.eps = eps # avoid devide by or close to zero -> explode
-        self.alpha = nn.Parameter(torch.ones(features)) # learnable Multiplied
-        self.bias = nn.Parameter(torch.ones(features)) # learnable Added
+        self.alpha = nn.Parameter(torch.ones(d_model)) # learnable Multiplied
+        self.bias = nn.Parameter(torch.ones(d_model)) # learnable Added
     
     def forward(self, x):
         # x: (batch, seq_len, d_model)
@@ -123,20 +123,20 @@ class MultiHeadAttentionBlock(nn.Module):
         return self.w_o(x)
 
 class ResidualConnection(nn.Module):
-    def __init__(self, features: int, dropout:float) -> None:
+    def __init__(self, d_model: int, dropout:float) -> None:
         super().__init__()
         self.dropout = nn.Dropout(dropout)
-        self.norm = LayerNormalization(features=features)
+        self.norm = LayerNormalization(d_model=d_model)
         
     def forward(self, x, sublayer):
         return x + self.dropout(sublayer(self.norm(x)))
     
 class EncoderBlock(nn.Module):
-    def __init__(self, features: int, self_attention_block: MultiHeadAttentionBlock, feed_forward_block: FeedForwardBlock, dropout: float) -> None:
+    def __init__(self, d_model: int, self_attention_block: MultiHeadAttentionBlock, feed_forward_block: FeedForwardBlock, dropout: float) -> None:
         super().__init__()
         self.self_attention_block = self_attention_block
         self.feed_forward_block = feed_forward_block
-        self.residual_connections = nn.ModuleList([ResidualConnection(features, dropout) for _ in range(2)])
+        self.residual_connections = nn.ModuleList([ResidualConnection(d_model, dropout) for _ in range(2)])
         
     def forward(self, x, src_mask):
         # add src_mask here in order to make <pad> not interact with others
@@ -145,10 +145,10 @@ class EncoderBlock(nn.Module):
         return x
     
 class Encoder(nn.Module):
-    def __init__(self, features: int, layers: nn.ModuleList) -> None:
+    def __init__(self, d_model: int, layers: nn.ModuleList) -> None:
         super().__init__()
         self.layers = layers
-        self.norms = LayerNormalization(features)
+        self.norms = LayerNormalization(d_model)
         
     def forward(self, x, mask):
         for layer in self.layers:
@@ -156,12 +156,12 @@ class Encoder(nn.Module):
         return self.norms(x)
     
 class DecoderBlock(nn.Module):
-    def __init__(self, features: int, self_attention_block: MultiHeadAttentionBlock, cross_attention_block: MultiHeadAttentionBlock, feed_forward_block:FeedForwardBlock, dropout: float) -> None:
+    def __init__(self, d_model: int, self_attention_block: MultiHeadAttentionBlock, cross_attention_block: MultiHeadAttentionBlock, feed_forward_block:FeedForwardBlock, dropout: float) -> None:
         super().__init__()
         self.self_attention_block = self_attention_block
         self.cross_attention_block = cross_attention_block
         self.feed_forward_block = feed_forward_block
-        self.residual_connections = nn.ModuleList([ResidualConnection(features, dropout) for _ in range(3)])
+        self.residual_connections = nn.ModuleList([ResidualConnection(d_model, dropout) for _ in range(3)])
     
     def forward(self, x, encoder_output, src_mask, tgt_mask):
         x = self.residual_connections[0](x, lambda x: self.self_attention_block(x, x, x, tgt_mask))
@@ -170,10 +170,10 @@ class DecoderBlock(nn.Module):
         return x
         
 class Decoder(nn.Module):
-    def __init__(self, features: int, layers: nn.ModuleList) -> None:
+    def __init__(self, d_model: int, layers: nn.ModuleList) -> None:
         super().__init__()
         self.layers = layers
-        self.norm = LayerNormalization(features)
+        self.norm = LayerNormalization(d_model)
         
     def forward(self, x, encoder_output, src_mask, tgt_mask):
         for layer in self.layers:
