@@ -59,8 +59,8 @@ def get_ds(config):
     val_ds_size = len(ds_raw) - train_ds_size
     train_ds_raw, val_ds_raw = random_split(ds_raw, [train_ds_size, val_ds_size])
     
-    train_ds = NewsSumDataset(train_ds_raw, tokenizer_src, tokenizer_tgt, config['text_src'], config['text_tgt'], config['seq_len'])
-    val_ds = NewsSumDataset(val_ds_raw, tokenizer_src, tokenizer_tgt, config['text_src'], config['text_tgt'], config['seq_len'])
+    train_ds = NewsSumDataset(train_ds_raw, tokenizer_src, tokenizer_tgt, config['text_src'], config['text_tgt'], config['src_seq_len'], config['tgt_seq_len'])
+    val_ds = NewsSumDataset(val_ds_raw, tokenizer_src, tokenizer_tgt, config['text_src'], config['text_tgt'], config['src_seq_len'], config['tgt_seq_len'])
     
     # Find the maximum length of each sentence in the source and target sentence
     max_len_src = 0
@@ -81,7 +81,7 @@ def get_ds(config):
     return train_dataloader, val_dataloader, tokenizer_src, tokenizer_tgt
 
 def get_model(config, vocab_src_len, vocab_tgt_len):
-    model = build_transformer(vocab_src_len, vocab_tgt_len, config["seq_len"], config['seq_len'], d_model=config['d_model'])
+    model = build_transformer(vocab_src_len, vocab_tgt_len, config["src_seq_len"], config['tgt_seq_len'], d_model=config['d_model'])
     return model
 
 def train_model(config):
@@ -153,13 +153,14 @@ def train_model(config):
         #run validation at the end of each epoch
         run_validation(model, val_dataloader, tokenizer_src, tokenizer_tgt, config['seq_len'], device, lambda msg: batch_iterator.write(msg), global_step)
         #save the model at the end of every epoch 
-        model_filename = get_weights_file_path(config, f'{epoch:02d}')
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'global_step': global_step
-        }, model_filename)
+        if epoch % 20 == 0:
+            model_filename = get_weights_file_path(config, f'{epoch:02d}')
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'global_step': global_step
+            }, model_filename)
 
 def greedy_decode(model, source, source_mask, tokenizer_src, tokenizer_tgt, max_len, device):
     sos_idx = tokenizer_tgt.token_to_id('[SOS]')

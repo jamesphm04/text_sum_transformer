@@ -5,8 +5,8 @@ from tokenizers import Tokenizer
 import torch 
 
 def summarize(sentence: str):
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = 'cpu'
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = 'cpu'
     print('Using device:', device)
     
     config = get_config()
@@ -14,7 +14,7 @@ def summarize(sentence: str):
     tokenizer_src = Tokenizer.from_file(str(Path(config['tokenizer_file'].format(config['text_src']))))
     tokenizer_tgt = Tokenizer.from_file(str(Path(config['tokenizer_file'].format(config['text_tgt']))))
     
-    model = build_transformer(tokenizer_src.get_vocab_size(), tokenizer_tgt.get_vocab_size(), config['seq_len'], config['seq_len'], config['d_model']).to(device)
+    model = build_transformer(tokenizer_src.get_vocab_size(), tokenizer_tgt.get_vocab_size(), config['src_seq_len'], config['tgt_seq_len'], config['d_model']).to(device)
     
     # load the pretrained weights
     model_filename = latest_weights_file_path(config)
@@ -26,7 +26,8 @@ def summarize(sentence: str):
     # model.load_state_dict(state['mode_state_dict']) 
     
     label = ''
-    seq_len = config['seq_len']
+    src_seq_len = config['seq_len']
+    tgt_seq_len = config['tgt_seq_len']
     
     # summarize
     model.eval()
@@ -37,7 +38,7 @@ def summarize(sentence: str):
             torch.tensor([tokenizer_src.token_to_id('[SOS]')], dtype=torch.int64),
             torch.tensor(source.ids, dtype=torch.int64),
             torch.tensor([tokenizer_src.token_to_id('[EOS]')], dtype=torch.int64),
-            torch.tensor([tokenizer_src.token_to_id('[PAD]')] * (seq_len - len(source.ids) - 2), dtype=torch.int64) 
+            torch.tensor([tokenizer_src.token_to_id('[PAD]')] * (src_seq_len - len(source.ids) - 2), dtype=torch.int64) 
         ], dim=0).to(device)
         
         source_mask = (source != tokenizer_src.token_to_id('[PAD]')).unsqueeze(0).unsqueeze(0).int().to(device)
@@ -53,7 +54,7 @@ def summarize(sentence: str):
         print(f"{f'PREDICTED: ':>12}", end='')
 
         # Generate the translation word by word
-        while decoder_input.size(1) < seq_len:
+        while decoder_input.size(1) < tgt_seq_len:
             # build mask for target and calculate output
             decoder_mask = torch.triu(torch.ones((1, decoder_input.size(1), decoder_input.size(1))), diagonal=1).type(torch.int).type_as(source_mask).to(device)
             out = model.decode(encoder_output, source_mask, decoder_input, decoder_mask)
