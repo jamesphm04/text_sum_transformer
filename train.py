@@ -38,7 +38,7 @@ def get_or_build_tokenizer(config, text_type, ds={}):
 
 def get_ds(config):
     # only has the train -> divide train, test, valid by ourself
-    ds_raw = load_dataset(f"{config['datasource']}", '1.0.0', split='train[:5%]')
+    ds_raw = load_dataset(f"{config['datasource']}", '1.0.0', split='train[:20%]')
     
     #cleaning the dataset
     df = pd.DataFrame(ds_raw)
