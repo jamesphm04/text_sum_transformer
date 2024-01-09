@@ -38,14 +38,20 @@ def get_or_build_tokenizer(config, text_type, ds={}):
 
 def get_ds(config):
     # only has the train -> divide train, test, valid by ourself
-    ds_raw = load_dataset(f"{config['datasource']}", '1.0.0', split='train[:20%]')
+    ds_raw = load_dataset(f"{config['datasource']}", '1.0.0', split='train[:50%]')
     
     #cleaning the dataset
     df = pd.DataFrame(ds_raw)
     df = df.drop('id', axis=1)
     
-    df = df[df['article'].apply(lambda x: len(x.split()) <= 300)]
-    df = df[df['highlights'].apply(lambda x: len(x.split()) <= 50)]
+    df['count_article'] = df['article'].apply(lambda x: len(str(x).split()))
+    df['count_highlights'] = df['highlights'].apply(lambda x: len(str(x).split()))
+    
+    df = df[(df['count_article'] >= 200) & (df['count_article'] <= 400)]
+    df = df[(df['count_highlights'] <= 50)]
+    
+    df = df.drop(['count_highlights', 'count_article'], axis=1)
+    
     df = df.reset_index(drop=True)
     
     ds_raw = Dataset.from_pandas(df)

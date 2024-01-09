@@ -5,8 +5,8 @@ def get_config():
         "batch_size": 4, # should be 8
         "num_epochs": 100, # should be 20
         "lr": 0.0001, # should be 10**-4
-        "src_seq_len": 700,
-        "tgt_seq_len": 80, 
+        "src_seq_len": 405,
+        "tgt_seq_len": 55, 
         "d_model": 512, #should be 512
         "datasource": 'cnn_dailymail',
         "text_src": "article",
