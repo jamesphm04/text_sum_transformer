@@ -159,7 +159,7 @@ def train_model(config):
             global_step += 1
             
         #run validation at the end of each epoch
-        run_validation(model, val_dataloader, tokenizer_src, tokenizer_tgt, config['seq_len'], device, lambda msg: batch_iterator.write(msg), global_step)
+        # run_validation(model, val_dataloader, tokenizer_src, tokenizer_tgt, config['seq_len'], device, lambda msg: batch_iterator.write(msg), global_step)
         #save the model at the end of every epoch 
         if epoch % 20 == 0:
             model_filename = get_weights_file_path(config, f'{epoch:02d}')
