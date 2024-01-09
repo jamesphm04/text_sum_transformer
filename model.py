@@ -222,7 +222,7 @@ class Transformer(nn.Module):
     
 # put it all together 
 
-def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_seq_len: int, tgt_seq_len: int=50, d_model: int=512, N: int=6, h: int=8, dropout: float=0.1, d_ff: int=2048) -> Transformer:
+def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_seq_len: int, tgt_seq_len: int=80, d_model: int=512, N: int=6, h: int=8, dropout: float=0.1, d_ff: int=2048) -> Transformer:
     # src_vocab_size : number of unique words in src vocab
     # tgt_vocab_size : number of unique words in tgt vocab
     # src_seq_len : max number of words in a src sentence
