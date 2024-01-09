@@ -38,7 +38,7 @@ def get_or_build_tokenizer(config, text_type, ds={}):
 
 def get_ds(config):
     # only has the train -> divide train, test, valid by ourself
-    ds_raw = load_dataset(f"{config['datasource']}", '1.0.0', split='train[:50%]')
+    ds_raw = load_dataset(f"{config['datasource']}", '1.0.0', split='train[:5%]')
     
     #cleaning the dataset
     df = pd.DataFrame(ds_raw)
@@ -47,12 +47,14 @@ def get_ds(config):
     df['count_article'] = df['article'].apply(lambda x: len(str(x).split()))
     df['count_highlights'] = df['highlights'].apply(lambda x: len(str(x).split()))
     
-    df = df[(df['count_article'] >= 200) & (df['count_article'] <= 400)]
+    df = df[(df['count_article'] <= 300)]
     df = df[(df['count_highlights'] <= 50)]
     
     df = df.drop(['count_highlights', 'count_article'], axis=1)
     
     df = df.reset_index(drop=True)
+    
+    print('Len of dataset: ', len(df['article']))
     
     ds_raw = Dataset.from_pandas(df)
     
@@ -92,8 +94,8 @@ def get_model(config, vocab_src_len, vocab_tgt_len):
 
 def train_model(config):
     #Define the device 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # device = 'cpu'
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = 'cpu'
     print(f'Using device {device}')
     
     #Make sure the weigths folder exists
